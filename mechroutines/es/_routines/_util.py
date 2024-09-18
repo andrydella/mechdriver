@@ -306,3 +306,10 @@ def fixings_subs_positions(samp_zma, all_ring_atoms_list, coos, unconnected_keys
         samp_zma = automol.zmat.set_values_by_name(samp_zma, new_key_dct)
 
     return samp_zma
+
+def write_zmas(s_zmas,algo):
+    with open(f"{algo}_samples.xyz","w") as f:
+        for zmai in s_zmas:
+            ge = automol.zmat.geometry(zmai)
+            geo_string = automol.geom.xyz_string(ge, comment="")
+            f.write(geo_string+"\n")

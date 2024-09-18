@@ -669,100 +669,112 @@ def ring_conformer_sampling(
     if algorithm in ["torsions","pucker","robust"]:
         print("nsamp for pucker or torsions algorithms: ",nsamp)
 
-
-    if algorithm == 'crest' or algorithm == 'robust': 
-        ring_puckering_with_crest(geo, zrxn, spc_info, vma, samp_zmas_crest)
-        samp_zmas["crest"] = samp_zmas_crest
-
-
-    if algorithm == 'pucker' or algorithm == 'robust': 
-        ring_puckering_with_cremerpople(geo, vma, tors_dcts, ngbs, nsamp, 
-                                        all_ring_atoms, coos, samp_zmas_pucker,unconnected_keys)
-    
-        # Now sample with dihedrals also 4-membered rings
-        for ring_atoms, samp_range_dct in tors_dcts:
-            ring_atoms = [int(idx)-1 for idx in ring_atoms.split('-')]
-            if len(ring_atoms) == 4:
-                print("Found a 4 membered ring")
-                print(samp_range_dct)
-                for i,samp_zmai in enumerate(samp_zmas_pucker):
-                    samp_zmas_pucker[i] = automol.zmat.samples(
-                                            samp_zmai, 1, samp_range_dct)[0]
-        samp_zmas["pucker"] = samp_zmas_pucker
+    if f"{algorithm}_samples.xyz" in os.listdir():
+        with open(f"{algorithm}/samples.xyz","r") as f:
+            samp_geos = (geoi for geoi,_ in automol.geom.from_xyz_trajectory_string(f.read()))
+        for geoi in samp_geos:
+            samp_zma = automol.zmat.from_geometry(vma, geoi)
+            samp_zmas[algorithm].append(samp_zma)
+    else:
+        print(f"{algorithm}_samples.xyz will be written\n")
+        if algorithm == 'crest' or algorithm == 'robust': 
+            ring_puckering_with_crest(geo, zrxn, spc_info, vma, samp_zmas_crest)
+            samp_zmas["crest"] = samp_zmas_crest
+            util.write_zmas(samp_zmas["crest"],algorithm)
 
 
-    if algorithm == 'torsions' or algorithm == 'robust':
-        samp_zmas_torsions = list(automol.zmat.samples(zma, nsamp, all_samp_range_dct))
-        all_ring_atoms_list_all, new_coord_rings_all = {}, {}
+        if algorithm == 'pucker' or algorithm == 'robust': 
+            ring_puckering_with_cremerpople(geo, vma, tors_dcts, ngbs, nsamp, 
+                                            all_ring_atoms, coos, samp_zmas_pucker,unconnected_keys)
         
-        for key_dct,_ in tors_dcts:
-            ring_atoms = [int(idx)-1 for idx in key_dct.split('-')]
-            all_ring_atoms_list_all[key_dct] = ring_atoms
-        first_ring_at_sub_dct, last_ring_at_sub_dct = util.subs_analysis(all_ring_atoms,
-                                                        all_ring_atoms_list_all, ngbs, geo, unconnected_keys)
-
-        for i,samp_zmai in enumerate(samp_zmas_torsions):
-            samp_geoi = automol.zmat.geometry(samp_zmai)
-            for key_dct,ring_atoms in all_ring_atoms_list_all.items():
-                new_coord_ring_all = automol.geom.coordinates(
-                                    samp_geoi, tuple(ring_atoms),angstrom=True)
-                new_coord_rings_all[key_dct] = [tuple(xyz) for xyz in new_coord_ring_all]
-            samp_zmas_torsions[i] = util.fixings_subs_positions(
-                                samp_zmai, all_ring_atoms_list_all, coos, unconnected_keys,
-                                first_ring_at_sub_dct, last_ring_at_sub_dct)         
-        samp_zmas["torsions"] = samp_zmas_torsions
+            # Now sample with dihedrals also 4-membered rings
+            for ring_atoms, samp_range_dct in tors_dcts:
+                ring_atoms = [int(idx)-1 for idx in ring_atoms.split('-')]
+                if len(ring_atoms) == 4:
+                    print("Found a 4 membered ring")
+                    print(samp_range_dct)
+                    for i,samp_zmai in enumerate(samp_zmas_pucker):
+                        samp_zmas_pucker[i] = automol.zmat.samples(
+                                                samp_zmai, 1, samp_range_dct)[0]
+            samp_zmas["pucker"] = samp_zmas_pucker
+            util.write_zmas(samp_zmas["pucker"],algorithm)
 
 
-    if algorithm == 'torsions2' or algorithm == 'robust':
-        average_dih = {}
-        for key_dct, samp_range_dct in tors_dcts:
-            ring_atoms = [int(idx)-1 for idx in key_dct.split('-')] 
-            dihs = []
-            print(ring_atoms)
-            for i in range(len(ring_atoms)):
-                atm_idxs = [ring_atoms[j%len(ring_atoms)] for j in range(i,i+4)]
-                print(atm_idxs)
-                dih = automol.geom.dihedral_angle(geo, *atm_idxs)
-                if dih > numpy.pi: 
-                    dih -= 2*numpy.pi
-                elif dih < -numpy.pi: 
-                    dih += 2*numpy.pi
-                dihs.append(dih)
-            avg_dih = 0.
-            for dih in dihs:
-                avg_dih += abs(dih)
-            avg_dih /= len(ring_atoms)
-            average_dih[key_dct] = avg_dih
+        if algorithm == 'torsions' or algorithm == 'robust':
+            samp_zmas_torsions = list(automol.zmat.samples(zma, nsamp, all_samp_range_dct))
+            all_ring_atoms_list_all, new_coord_rings_all = {}, {}
+            
+            for key_dct,_ in tors_dcts:
+                ring_atoms = [int(idx)-1 for idx in key_dct.split('-')]
+                all_ring_atoms_list_all[key_dct] = ring_atoms
+            first_ring_at_sub_dct, last_ring_at_sub_dct = util.subs_analysis(all_ring_atoms,
+                                                            all_ring_atoms_list_all, ngbs, geo, unconnected_keys)
 
-        samp_zmas_torsions_two = list(automol.zmat.samples_avg_dih(zma, geo, 
-                                  tors_dcts, average_dih, ring_tors_dct,dih_remover))
-        
-        all_ring_atoms_list_all, new_coord_rings_all = {}, {}       
-        for key_dct,_ in tors_dcts:
-            ring_atoms = [int(idx)-1 for idx in key_dct.split('-')]
-            all_ring_atoms_list_all[key_dct] = ring_atoms
-        first_ring_at_sub_dct, last_ring_at_sub_dct = util.subs_analysis(all_ring_atoms,
-                                                        all_ring_atoms_list_all, ngbs, geo, unconnected_keys)
-        print("sub analysis")
-        print(first_ring_at_sub_dct, last_ring_at_sub_dct)
-
-        for i,samp_zmai in enumerate(samp_zmas_torsions_two):
-            samp_geoi = automol.zmat.geometry(samp_zmai)
-            for key_dct,ring_atoms in all_ring_atoms_list_all.items():
-                new_coord_ring_all = automol.geom.coordinates(
+            for i,samp_zmai in enumerate(samp_zmas_torsions):
+                samp_geoi = automol.zmat.geometry(samp_zmai)
+                for key_dct,ring_atoms in all_ring_atoms_list_all.items():
+                    new_coord_ring_all = automol.geom.coordinates(
                                         samp_geoi, tuple(ring_atoms),angstrom=True)
-                new_coord_rings_all[key_dct] = [tuple(xyz) for xyz in new_coord_ring_all]
-            samp_zmas_torsions_two[i] = util.fixings_subs_positions(
-                                samp_zmai, all_ring_atoms_list_all, coos, unconnected_keys,
-                                first_ring_at_sub_dct, last_ring_at_sub_dct)         
-        samp_zmas["torsions2"] = samp_zmas_torsions_two
+                    new_coord_rings_all[key_dct] = [tuple(xyz) for xyz in new_coord_ring_all]
+                samp_zmas_torsions[i] = util.fixings_subs_positions(
+                                    samp_zmai, all_ring_atoms_list_all, coos, unconnected_keys,
+                                    first_ring_at_sub_dct, last_ring_at_sub_dct)         
+            samp_zmas["torsions"] = samp_zmas_torsions
+            util.write_zmas(samp_zmas["torsions"],algorithm)
 
 
-    if algorithm == "etkdg" or algorithm == 'robust':
-        if zrxn is not None:
-            constrained_atoms = util.get_ts_reacting_atoms_dists(zrxn, geo)
-        samp_zmas["etkdg"] = util.gen_confs(
-                             zma, vma, int(nsamp/10), zrxn, constrained_atoms)
+        if algorithm == 'torsions2' or algorithm == 'robust':
+            average_dih = {}
+            for key_dct, samp_range_dct in tors_dcts:
+                ring_atoms = [int(idx)-1 for idx in key_dct.split('-')] 
+                dihs = []
+                print(ring_atoms)
+                for i in range(len(ring_atoms)):
+                    atm_idxs = [ring_atoms[j%len(ring_atoms)] for j in range(i,i+4)]
+                    print(atm_idxs)
+                    dih = automol.geom.dihedral_angle(geo, *atm_idxs)
+                    if dih > numpy.pi: 
+                        dih -= 2*numpy.pi
+                    elif dih < -numpy.pi: 
+                        dih += 2*numpy.pi
+                    dihs.append(dih)
+                avg_dih = 0.
+                for dih in dihs:
+                    avg_dih += abs(dih)
+                avg_dih /= len(ring_atoms)
+                average_dih[key_dct] = avg_dih
+
+            samp_zmas_torsions_two = list(automol.zmat.samples_avg_dih(zma, geo, 
+                                    tors_dcts, average_dih, ring_tors_dct,dih_remover))
+            
+            all_ring_atoms_list_all, new_coord_rings_all = {}, {}       
+            for key_dct,_ in tors_dcts:
+                ring_atoms = [int(idx)-1 for idx in key_dct.split('-')]
+                all_ring_atoms_list_all[key_dct] = ring_atoms
+            first_ring_at_sub_dct, last_ring_at_sub_dct = util.subs_analysis(all_ring_atoms,
+                                                            all_ring_atoms_list_all, ngbs, geo, unconnected_keys)
+            print("sub analysis")
+            print(first_ring_at_sub_dct, last_ring_at_sub_dct)
+
+            for i,samp_zmai in enumerate(samp_zmas_torsions_two):
+                samp_geoi = automol.zmat.geometry(samp_zmai)
+                for key_dct,ring_atoms in all_ring_atoms_list_all.items():
+                    new_coord_ring_all = automol.geom.coordinates(
+                                            samp_geoi, tuple(ring_atoms),angstrom=True)
+                    new_coord_rings_all[key_dct] = [tuple(xyz) for xyz in new_coord_ring_all]
+                samp_zmas_torsions_two[i] = util.fixings_subs_positions(
+                                    samp_zmai, all_ring_atoms_list_all, coos, unconnected_keys,
+                                    first_ring_at_sub_dct, last_ring_at_sub_dct)         
+            samp_zmas["torsions2"] = samp_zmas_torsions_two
+            util.write_zmas(samp_zmas["torsions2"],algorithm)
+
+
+        if algorithm == "etkdg" or algorithm == 'robust':
+            if zrxn is not None:
+                constrained_atoms = util.get_ts_reacting_atoms_dists(zrxn, geo)
+            samp_zmas["etkdg"] = util.gen_confs(
+                                zma, vma, int(nsamp/10), zrxn, constrained_atoms)
+            util.write_zmas(samp_zmas["etkdg"],algorithm)
         
   #  with open("allsamples.xyz","w") as f:
   #      for algo,s_zmas in samp_zmas.items():
