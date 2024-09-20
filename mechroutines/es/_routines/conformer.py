@@ -670,11 +670,11 @@ def ring_conformer_sampling(
         print("nsamp for pucker or torsions algorithms: ",nsamp)
 
     if f"{algorithm}_samples.xyz" in os.listdir():
+        print("I found a samples file, using that!")
         with open(f"{algorithm}_samples.xyz","r") as f:
             samp_geos = (geoi for geoi,_ in automol.geom.from_xyz_trajectory_string(f.read()))
-        for geoi in samp_geos:
-            samp_zma = automol.zmat.from_geometry(vma, geoi)
-            samp_zmas[algorithm].append(samp_zma)
+        samp_zmas[algorithm] = [automol.zmat.from_geometry(vma, 
+                                    geoi) for geoi in samp_geos]
     else:
         print(f"{algorithm}_samples.xyz will be written\n")
         if algorithm == 'crest' or algorithm == 'robust': 
