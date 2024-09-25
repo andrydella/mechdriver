@@ -665,6 +665,7 @@ def ring_conformer_sampling(
     samp_zmas_crest,samp_zmas_pucker,samp_zmas_torsions = [], [], []
     vma =  automol.zmat.vmatrix(zma)
 
+    t0 = time.perf_counter()
     nsamp = util.ring_samp_zmas(all_ring_atoms, nsamp_par, len(rings_atoms))
     if algorithm in ["torsions","pucker","robust"]:
         print("nsamp for pucker or torsions algorithms: ",nsamp)
@@ -776,6 +777,8 @@ def ring_conformer_sampling(
                                 zma, vma, int(nsamp/10), zrxn, constrained_atoms)
             util.write_zmas(samp_zmas["etkdg"],algorithm)
         
+        t1 = time.perf_counter()
+        print(f"Time in algorithm: {t1-t0}")
   #  with open("allsamples.xyz","w") as f:
   #      for algo,s_zmas in samp_zmas.items():
   #          for zmai in s_zmas:
@@ -784,6 +787,7 @@ def ring_conformer_sampling(
   #              f.write(geo_string+"\n")        
 
     print("\n\nENTERING CHECKS LOOP\n\n")
+    t0 = time.perf_counter()
     # Control dictionaries
     check_dct = {
         'dist': 3.5e-1,
@@ -822,7 +826,10 @@ def ring_conformer_sampling(
                                             thy_info, spc_info, vma, geo
                                             ))
         print(f"Valid samples after checks: {len(unique_zmas)}")
+    t1 = time.perf_counter()
+    print(f"Time in checks: {t1-t0}")
     # Set up the DBSCAN clustering
+    t0 = time.perf_counter()
     unique_geos = [automol.zmat.geometry(zmai) for zmai in unique_zmas]
 
     if len(unique_geos) > 0:
@@ -838,10 +845,14 @@ def ring_conformer_sampling(
     unique_zmas = [automol.zmat.from_geometry(vma, geoi) for geoi in unique_geos]
     print(f"Valid samples after clustering: {len(unique_zmas)}")
 
+    t1 = time.perf_counter()
+    print(f"Time in cluster: {t1-t0}")
+
     with open("uniques.xyz","w") as f:  
         for geoi in unique_geos:
             geo_string = automol.geom.xyz_string(geoi, comment="")
             f.write(geo_string+"\n")  
+
 
     ######## Generate extra samples by randomizing the position of the substituents
     if tors_names:
@@ -997,6 +1008,10 @@ def ring_conformer_sampling(
     with open("final-rings-stru.xyz","w") as f:
         for geo_string in rings_geos_strings:
             f.write(geo_string+"\n")
+
+    n_rids,ridss = count_rng_confs(cnf_save_fs)
+    print(f"number of unique ring states: {n_rids}")
+    print(ridss)
 
 
 ########### CHECKS LOOPS #############
@@ -1871,3 +1886,19 @@ def rng_loc_for_geo(geo, cnf_save_fs):
             break
 
     return rid
+
+
+def count_rng_confs(cnf_save_fs):
+    """ Count rid folders
+    """
+    unique_rids = []
+    checked_rids = []
+    for locs in cnf_save_fs[-1].existing():
+        print("Debug: locs", locs)        
+        current_rid, _ = locs
+        if current_rid in checked_rids:
+            continue
+        rid = locs[0]
+        unique_rids.append(rid)
+
+    return len(unique_rids),unique_rids
