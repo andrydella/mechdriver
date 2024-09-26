@@ -1901,5 +1901,6 @@ def count_rng_confs(cnf_save_fs):
             continue
         rid = locs[0]
         unique_rids.append(rid)
+        checked_rids.append(rid)
 
     return len(unique_rids),unique_rids
