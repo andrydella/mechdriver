@@ -152,7 +152,7 @@ def gen_confs(zma, vma, num_conf, zrxn, constr_ats):
     # _, zc_ = automol.zmat.geometry_with_conversion_info(zma)       
     # return [automol.zmat.zmatrix_with_conversion_info(geoi, zc_=zc_) for geoi in geos]
 
-    return [automol.geom.from_geometry(vma, geoi) for geoi in geos]
+    return [automol.zmat.from_geometry(vma, geoi) for geoi in geos]
 
 
 def subs_analysis(all_ring_atoms,all_ring_atoms_list, ngbs, geo, unconnected_keys):
